@@ -98,3 +98,7 @@ class BytesReader(val bytes: Array[Byte], private val startOffset: Int, val leng
 
   def apply(index: Int): Byte = bytes(index)
 }
+
+object BytesReader {
+  def apply(bytes: Array[Byte]): BytesReader = new BytesReader(bytes)
+}

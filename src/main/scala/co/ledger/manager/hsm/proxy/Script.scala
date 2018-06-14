@@ -14,21 +14,27 @@ import scala.util.{Failure, Success, Try}
   * Time: 14:06
   *
   */
-abstract class RunningScript(val dongle: Dongle) {
-
-  def exchange(apdu: Array[Byte]): Future[BytesReader] = {
-    null
-  }
-
-  def bulkExchange(bulk: List[Array[Byte]])
-
-  def success[A](result: A): Unit = _promise.tryComplete(Try(JSONUtils.serialize(result)))
-  def fail(ex: Throwable): Unit = _promise.failure(ex)
-  def future: Future[String] = _promise.future
-
-  private val _promise = Promise[String]()
-}
 
 trait Script {
-  def apply(transport: Transport, params: Map[String, String])(implicit ec: ExecutionContext): RunningScript
+  implicit class RichTransport(val transport: Transport) {
+    def exchange(apdu: Array[Byte])(implicit ec: ExecutionContext): Future[BytesReader] = transport.sendApdu(apdu).map(BytesReader.apply)
+    def bulkExchange(bulk: List[Array[Byte]])(implicit ec: ExecutionContext): Future[BytesReader] = transport.sendBulk(bulk).map(BytesReader.apply)
+  }
+
+  def apply(transport: Transport, params: Map[String, String])(implicit ec: ExecutionContext): Unit
+}
+
+trait SafeScript[Params] extends Script {
+
+  def parseParams(params: Map[String, String]): Params
+
+  def run(transport: Transport, params: Params)(implicit ec: ExecutionContext): Future[Any]
+
+  override def apply(transport: Transport, params: Map[String, String])(implicit ec: ExecutionContext): Unit = {
+    Future.fromTry(Try(parseParams(params))) flatMap { p =>
+      run(transport, p)
+    } recover {
+      case all: Throwable => transport.fail(all.getMessage)
+    }
+  }
 }

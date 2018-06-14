@@ -1,6 +1,7 @@
 package co.ledger.manager.hsm.proxy
 
 import co.ledger.manager.hsm.proxy.proxy.WebSocketScriptRunnerServer
+import co.ledger.manager.hsm.proxy.scripts.EchoScript
 import co.ledger.manager.hsm.proxy.server.ScriptRunnerServer
 import com.typesafe.config.{Config, ConfigFactory}
 
@@ -14,11 +15,14 @@ import com.typesafe.config.{Config, ConfigFactory}
   */
 
 trait ApplImpl extends App {
+  val scripts: Map[String, Script] = Map(
+    "/echo" -> new EchoScript
+  )
   val config: Config
   lazy val server: ScriptRunnerServer = {
     config.getString("hsm.engine") match {
       case "websocket" =>
-        new WebSocketScriptRunnerServer(Map())
+        new WebSocketScriptRunnerServer(scripts)
       case unknown =>
         throw new Exception(s"Unknown server engine '$unknown'")
     }

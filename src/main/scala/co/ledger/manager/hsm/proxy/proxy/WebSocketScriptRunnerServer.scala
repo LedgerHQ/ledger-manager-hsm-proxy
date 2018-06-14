@@ -37,17 +37,24 @@ class WebSocketScriptRunnerServer(scripts: Map[String, Script]) extends ScriptRu
       resolve(uri.path.toString()) match {
         case Some(script) =>
           conn.setScript(Some(script))
+          script(transport, uri.query.paramMap.map({case (k, v) => (k, v(0))}))
         case None =>
-          Future(transport.fail(s"Unknown script ${uri.path.toString()}"))
+          transport.fail(s"Unknown script ${uri.path.toString()}")
       }
     }
 
-    override def onClose(conn: WebSocket, code: Int, reason: String, remote: Boolean): Unit =
-        conn.transport.foreach(_.fail(s"WebSocket closed $code $reason"))
+    override def onClose(conn: WebSocket, code: Int, reason: String, remote: Boolean): Unit = {
+      conn.transport.foreach(_.fail(s"WebSocket closed $code $reason"))
+      conn.release()
+    }
 
     override def onMessage(conn: WebSocket, message: String): Unit = conn.transport.foreach(_.receive(message))
 
-    override def onError(conn: WebSocket, ex: Exception): Unit = conn.transport.foreach(_.fail(ex.getMessage))
+    override def onError(conn: WebSocket, ex: Exception): Unit = {
+      ex.printStackTrace()
+      conn.transport.foreach(_.fail(ex.getMessage))
+      conn.release()
+    }
 
     override def onStart(): Unit = {}
 
@@ -68,7 +75,7 @@ object WebSocketScriptRunnerServer {
     def setTransport(transport: Option[WebSocketTransport]): Unit = attachment(attachment.copy(transport = transport))
     def setScript(script: Option[Script]): Unit = attachment(attachment.copy(script = script))
 
-
+    def release(): Unit = attachment(RichWebSocketAttachment(None, None))
 
     private def attachment: RichWebSocketAttachment =
       if (ws != null && ws.getAttachment[RichWebSocketAttachment] != null)
@@ -76,7 +83,7 @@ object WebSocketScriptRunnerServer {
       else
         RichWebSocketAttachment(None, None)
 
-    private def attachment(attachment: RichWebSocketAttachment): Unit = ws.setAttachment(attachment)
+    private def attachment(attachment: RichWebSocketAttachment): Unit = if (ws != null) ws.setAttachment(attachment)
   }
 
   private case class RichWebSocketAttachment(transport: Option[WebSocketTransport], script: Option[Script])
