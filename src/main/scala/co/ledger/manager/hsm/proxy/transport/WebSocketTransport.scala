@@ -48,10 +48,11 @@ class WebSocketTransport(webSocket: WebSocket) extends Transport {
     Try(JSONUtils.deserialize[Message](message)).recover({
       case all: Throwable => throw new Exception(s"Invalid message '$message'")
     }).map({ response =>
-      val apdu = response.apdu
-      if (apdu.isFailure) throw new Exception(s"Unable to parse APDU data '${response.data}'.")
       val query = popQuery(response.nonce)
       if (query.isEmpty) throw new Exception(s"Request ${response.nonce} does not exist.")
+      if (response.query == "error") throw new Exception(response.data)
+      val apdu = response.apdu
+      if (apdu.isFailure) throw new Exception(s"Unable to parse APDU data '${response.data}'.")
       query.foreach(_.success(apdu.get))
     }).recover({
       case all: Throwable => fail(all.getMessage)

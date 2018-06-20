@@ -1,19 +1,14 @@
-package co.ledger.manager.hsm.proxy.proxy
+package co.ledger.manager.hsm.proxy.server
 
 import java.net.InetSocketAddress
 
 import co.ledger.manager.hsm.proxy.Script
-import co.ledger.manager.hsm.proxy.server.ScriptRunnerServer
+import co.ledger.manager.hsm.proxy.concurrent.ExecutionContext.Implicits.context
 import co.ledger.manager.hsm.proxy.transport.WebSocketTransport
+import io.lemonlabs.uri._
 import org.java_websocket.WebSocket
 import org.java_websocket.handshake.ClientHandshake
 import org.java_websocket.server.WebSocketServer
-import io.lemonlabs.uri._
-import co.ledger.manager.hsm.proxy.concurrent.ExecutionContext.Implicits.context
-
-import scala.None
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future, Promise}
 
 /**
   * Describe your class here.
@@ -23,10 +18,10 @@ import scala.concurrent.{Await, Future, Promise}
   * Time: 17:50
   *
   */
-class WebSocketScriptRunnerServer(scripts: Map[String, Script]) extends ScriptRunnerServer(scripts) {
+class WebSocketScriptRunnerServer(hostname: String, port: Int, scripts: Map[String, Script]) extends ScriptRunnerServer(scripts) {
   import WebSocketScriptRunnerServer._
 
-  private class Server extends WebSocketServer(new InetSocketAddress("localhost", 3000)) {
+  private class Server extends WebSocketServer(new InetSocketAddress(hostname, port)) {
     override def onOpen(conn: WebSocket, handshake: ClientHandshake): Unit = {
       // Create transport
       val transport = new WebSocketTransport(conn)
@@ -62,9 +57,11 @@ class WebSocketScriptRunnerServer(scripts: Map[String, Script]) extends ScriptRu
 
   }
 
-  override def run(): Unit = {
-    new Server().run()
-  }
+  override def run(): Unit = _server.run()
+
+  override def stop(): Unit = _server.stop()
+
+  private val _server = new Server
 }
 
 object WebSocketScriptRunnerServer {

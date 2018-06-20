@@ -15,6 +15,7 @@ import scala.concurrent.Future
 abstract class ScriptRunnerServer(scripts: Map[String, Script]) {
 
   def run(): Unit
+  def stop(): Unit
 
   def resolve(scriptPath: String): Option[Script] = scripts.get(scriptPath)
 
