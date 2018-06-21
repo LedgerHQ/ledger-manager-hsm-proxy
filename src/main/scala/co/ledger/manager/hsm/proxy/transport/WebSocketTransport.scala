@@ -45,14 +45,15 @@ class WebSocketTransport(webSocket: WebSocket) extends Transport {
   }
 
   def receive(message: String): Unit = {
-    Try(JSONUtils.deserialize[Message](message)).recover({
+    Try(JSONUtils.deserialize[Response](message)).recover({
       case all: Throwable => throw new Exception(s"Invalid message '$message'")
     }).map({ response =>
       val query = popQuery(response.nonce)
       if (query.isEmpty) throw new Exception(s"Request ${response.nonce} does not exist.")
-      if (response.query == "error") throw new Exception(response.data)
+      if (response.response != "success" && response.response != "error") throw new Exception(response.data)
       val apdu = response.apdu
       if (apdu.isFailure) throw new Exception(s"Unable to parse APDU data '${response.data}'.")
+      if (response.response == "error") throw new Exception(s"Invalid status ${HexUtils.valueOf(response.apdu.get)}")
       query.foreach(_.success(apdu.get))
     }).recover({
       case all: Throwable => fail(all.getMessage)
@@ -94,7 +95,8 @@ case class UnsafeConnection() extends Exception("The connection is currently uns
 
 object WebSocketTransport {
   case class NoncelessMessage(query: String, data: Option[String])
-  case class Message(nonce: Int, query: String, data: String) {
+  case class Message(nonce: Int, query: String, data: String)
+  case class Response(nonce: Int, response: String, data: String) {
     def apdu: Try[Array[Byte]] = Try(HexUtils.valueOf(data))
   }
   case class BulkMessage(nonce: Int, query: String, data: Seq[String])

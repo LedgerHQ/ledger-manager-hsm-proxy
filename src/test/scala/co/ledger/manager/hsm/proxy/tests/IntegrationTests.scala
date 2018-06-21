@@ -49,14 +49,24 @@ class IntegrationTests extends FlatSpec with BeforeAndAfterAll {
     assert(answer.query == "error")
   }
 
-  it should "send me back my error in case of error during exchange" in {
+  it should "send me back my error in case of fatal error on client side" in {
     val client = Client("/echo", QueryString.fromPairs())
     client.connect()
     val message = client.receive()
     assert(Message(Some(1), Some("0102"), "exchange") == message)
     val errorMessage = "Fatal error system"
-    val answer =  client.fail(message, "Fatal error system")
+    val answer =  client.fatalFail(message, errorMessage)
     assert(answer.query == "error" && answer.data.get == errorMessage)
+  }
+
+  it should "send me back SW in case of error on device side" in {
+    val client = Client("/echo", QueryString.fromPairs())
+    client.connect()
+    val message = client.receive()
+    assert(Message(Some(1), Some("0102"), "exchange") == message)
+    val statusWord = "6a84".toLowerCase
+    val answer =  client.fail(message, statusWord)
+    assert(answer.query == "error" && answer.data.get.toLowerCase.contains(statusWord))
   }
 
   override protected def beforeAll(): Unit = server.start()

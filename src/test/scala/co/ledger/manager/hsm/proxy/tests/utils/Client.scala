@@ -51,13 +51,19 @@ class Client(url: Url) {
   }
 
   def answer(msg: Message, data: Array[Byte]): Message = {
-    val a = msg.copy(data = Some(HexUtils.valueOf(data)))
+    val a = msg.respond(response = "success", data = HexUtils.valueOf(data))
     _ws.send(JSONUtils.serialize(a))
     receive()
   }
 
   def fail(msg: Message, message: String): Message = {
-    val a = msg.copy(data = Some(message), query = "error")
+    val a = msg.respond(response = "error", data = message)
+    _ws.send(JSONUtils.serialize(a))
+    receive()
+  }
+
+  def fatalFail(msg: Message, message: String): Message = {
+    val a = msg.respond(data = message, response = "fatal_error")
     _ws.send(JSONUtils.serialize(a))
     receive()
   }
@@ -101,4 +107,8 @@ object Client {
   def apply(path: String, params: QueryString): Client = new Client(Url(scheme = "http", host = hostname, port = port, query = params, path = path))
 }
 
-case class Message(nonce: Option[Int], data: Option[String], query: String)
+case class Response(nonce: Int, data: String, response: String)
+case class Message(nonce: Option[Int], data: Option[String], query: String) {
+  def respond(response: String = query, nonce: Int = Message.this.nonce.get , data: String = Message.this.data.get): Response =
+    Response(nonce, data, response)
+}
