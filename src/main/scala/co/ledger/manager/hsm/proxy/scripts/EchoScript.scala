@@ -2,7 +2,7 @@ package co.ledger.manager.hsm.proxy.scripts
 
 import co.ledger.manager.hsm.proxy.{SafeScript, Script}
 import co.ledger.manager.hsm.proxy.transport.Transport
-import co.ledger.manager.hsm.proxy.utils.HexUtils
+import co.ledger.manager.hsm.proxy.utils.{HexUtils, ParamsMap}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -17,8 +17,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 
 class EchoScript extends SafeScript[EchoParams] {
-  override def parseParams(params: Map[String, String]): EchoParams = {
-    EchoParams(params.get("repeat").map(_.toInt))
+  override def parseParams(params: ParamsMap): EchoParams = {
+    EchoParams(params.getInt("repeat"))
   }
 
   override def run(transport: Transport, params: EchoParams)(implicit ec: ExecutionContext): Future[Any] =

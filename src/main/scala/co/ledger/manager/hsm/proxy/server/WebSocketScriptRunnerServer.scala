@@ -5,6 +5,8 @@ import java.net.InetSocketAddress
 import co.ledger.manager.hsm.proxy.Script
 import co.ledger.manager.hsm.proxy.concurrent.ExecutionContext.Implicits.context
 import co.ledger.manager.hsm.proxy.transport.WebSocketTransport
+import co.ledger.manager.hsm.proxy.utils.ParamsMap
+import com.typesafe.scalalogging.LazyLogging
 import io.lemonlabs.uri._
 import org.java_websocket.WebSocket
 import org.java_websocket.handshake.ClientHandshake
@@ -18,7 +20,9 @@ import org.java_websocket.server.WebSocketServer
   * Time: 17:50
   *
   */
-class WebSocketScriptRunnerServer(hostname: String, port: Int, scripts: Map[String, Script]) extends ScriptRunnerServer(scripts) {
+class WebSocketScriptRunnerServer(hostname: String, port: Int, scripts: Map[String, Script])
+  extends ScriptRunnerServer(scripts) with LazyLogging {
+
   import WebSocketScriptRunnerServer._
 
   private class Server extends WebSocketServer(new InetSocketAddress(hostname, port)) {
@@ -27,18 +31,23 @@ class WebSocketScriptRunnerServer(hostname: String, port: Int, scripts: Map[Stri
       val transport = new WebSocketTransport(conn)
       conn.setTransport(Some(transport))
 
+      logger.info(s"[${transport.id}] New connection on ${handshake.getResourceDescriptor}")
+
       // Resolve script
       val uri = RelativeUrl.parse(handshake.getResourceDescriptor)
       resolve(uri.path.toString()) match {
         case Some(script) =>
+          logger.info(s"[${transport.id}] Starting script ${uri.path.toString()}")
           conn.setScript(Some(script))
-          script(transport, uri.query.paramMap.map({case (k, v) => (k, v(0))}))
+          script(transport, new ParamsMap(uri.query.paramMap.map({case (k, v) => (k, v(0))})))
         case None =>
+          logger.error(s"[${transport.id}] Unknown script ${uri.path.toString()}")
           transport.fail(s"Unknown script ${uri.path.toString()}")
       }
     }
 
     override def onClose(conn: WebSocket, code: Int, reason: String, remote: Boolean): Unit = {
+      conn.transport.foreach(t => logger.info(s"[${t.id}] Closing"))
       conn.transport.foreach(_.fail(s"WebSocket closed $code $reason"))
       conn.release()
     }
@@ -46,7 +55,8 @@ class WebSocketScriptRunnerServer(hostname: String, port: Int, scripts: Map[Stri
     override def onMessage(conn: WebSocket, message: String): Unit = conn.transport.foreach(_.receive(message))
 
     override def onError(conn: WebSocket, ex: Exception): Unit = {
-      ex.printStackTrace()
+      logger.error("WebSocket error", ex)
+      conn.transport.foreach(t => logger.info(s"[${t.id}] ${ex.getMessage}"))
       conn.transport.foreach(_.fail(ex.getMessage))
       conn.release()
     }

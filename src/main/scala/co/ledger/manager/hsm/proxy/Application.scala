@@ -1,9 +1,9 @@
 package co.ledger.manager.hsm.proxy
 
-import co.ledger.manager.hsm.proxy.Application.server
-import co.ledger.manager.hsm.proxy.scripts.EchoScript
+import co.ledger.manager.hsm.proxy.scripts.{EchoScript, UpdateFirmwareScript}
 import co.ledger.manager.hsm.proxy.server.{ScriptRunnerServer, WebSocketScriptRunnerServer}
 import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.scalalogging.LazyLogging
 
 /**
   * Application entry point
@@ -14,23 +14,23 @@ import com.typesafe.config.{Config, ConfigFactory}
   *
   */
 
-trait ManagerHsmProxy {
-  val scripts: Map[String, Script] = Map(
-    "/echo" -> new EchoScript
+trait ManagerHsmProxy extends LazyLogging {
+  lazy val scripts: Map[String, Script] = Map(
+    "/echo" -> new EchoScript,
+    "/install" -> new UpdateFirmwareScript(config)
   )
   val config: Config
   def server: ScriptRunnerServer = {
     config.getString("hsm.engine") match {
       case "websocket" =>
-        new WebSocketScriptRunnerServer(config.getString("server.hostname"), config.getInt("server.port"), scripts)
+        val port =  config.getInt("server.port")
+        val hostname = config.getString("server.hostname")
+        logger.info(s"Server started on $hostname:$port")
+        new WebSocketScriptRunnerServer(hostname, port, scripts)
       case unknown =>
         throw new Exception(s"Unknown server engine '$unknown'")
     }
   }
-
-  val script: List[Script] = List(
-
-  )
 
   def run(): Unit = server.run()
 
@@ -38,7 +38,7 @@ trait ManagerHsmProxy {
 }
 
 object Application extends App with ManagerHsmProxy {
-  override val config: Config = ConfigFactory.load("application.conf")
+  override val config: Config = ConfigFactory.defaultApplication()
 
    run()
 }

@@ -12,6 +12,9 @@ import scala.concurrent.Future
   *
   */
 trait Transport {
+
+  def id: Int = hashCode()
+
   /**
     * Send a single APDU command to the remote device, and get the data returned by the device.
     * @param apdu A single APDU command
@@ -42,4 +45,5 @@ trait Transport {
     * @param message An optional string message to send to the client.
     */
   def success(message: String): Unit
+
 }

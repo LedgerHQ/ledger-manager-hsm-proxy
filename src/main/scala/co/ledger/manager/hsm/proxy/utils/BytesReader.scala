@@ -96,6 +96,13 @@ class BytesReader(val bytes: Array[Byte], private val startOffset: Int, val leng
 
   def available: Int = bytes.length - _offset
 
+  def offset: Int = _offset
+
+  /**
+    * Get the byte relative to current offset without moving the cursor.
+    */
+  def peekByte(offset: Int): Int = this(_offset + offset) & 0xFF
+
   def apply(index: Int): Byte = bytes(index)
 }
 

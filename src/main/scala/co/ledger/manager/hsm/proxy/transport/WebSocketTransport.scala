@@ -27,7 +27,12 @@ class WebSocketTransport(webSocket: WebSocket) extends Transport {
     promise.future
   }
 
-  override def sendBulk(bulk: List[Array[Byte]]): Future[Array[Byte]] = ???
+  override def sendBulk(bulk: List[Array[Byte]]): Future[Array[Byte]] = {
+    val nonce = newNonce()
+    val promise = newQuery(nonce)
+    webSocket.send(newBulkMessage(nonce, bulk))
+    promise.future
+  }
 
   override def fail(errorMessage: String): Unit = safe() {
     webSocket.send(newErrorMessage(Some(errorMessage)))
@@ -66,6 +71,9 @@ class WebSocketTransport(webSocket: WebSocket) extends Transport {
   private def newSuccessMessage(message: Option[String]): NoncelessMessage = NoncelessMessage("success", message)
   private def newApduMessage(nonce: Int, apdu: Array[Byte]): Message = {
     Message(nonce, "exchange", HexUtils.valueOf(apdu))
+  }
+  private def newBulkMessage(nonce: Int, apdus: List[Array[Byte]]): BulkMessage = {
+    BulkMessage(nonce, "bulk", apdus.map(HexUtils.valueOf))
   }
 
   private def newNonce(): Int = synchronized {
